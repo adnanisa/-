@@ -87,3 +87,49 @@ test('appeal topic is tied to its retrieved reference in this demo policy', () =
  d.topic.main='contract';d.topic.saved=true;d.topic.courtId='one';d.topic.courts=[{id:'one'}];
  assert.ok(D.validateStep(d,1).some(e=>e.field==='topic.main'));
 });
+
+test('required subrequests depend on case type and do not block optional cases', () => {
+ const d=D.createDraft();d.caseType='مدنية';d.topic.main='civil';d.topic.saved=true;
+ d.topic.courts=[{id:'one'}];d.topic.courtId='one';
+ assert.ok(D.validateStep(d,1).some(e=>e.field==='subtopics'));
+ d.subtopics=[{id:'s1',name:'مطالبة مالية',amount:'15.250'}];
+ assert.equal(D.validateStep(d,1).length,0);
+ d.caseType='شرعية';d.subtopics=[];
+ assert.equal(D.validateStep(d,1).length,0);
+});
+test('appeal availability follows the selected judgment and exact demo calendar day', () => {
+ const d=D.createDraft('appeal');d.reference={number:'CASE-2026-1001',...D.lookupReference('appeal','CASE-2026-1001','valid'),judgment:'J-01'};
+ assert.equal(D.appealAvailability(d,'2026-11-12').remainingDays,8);
+ d.reference.judgment='J-02';assert.equal(D.appealAvailability(d,'2026-11-12').status,'closing');
+ assert.equal(D.appealAvailability(d,'2026-11-14').status,'today');
+ assert.equal(D.appealAvailability(d,'2026-11-14').allowed,true);
+ assert.equal(D.appealAvailability(d,'2026-11-15').allowed,false);
+ d.reference.judgment='unknown';assert.equal(D.appealAvailability(d).allowed,false);
+ d.reference.judgment='J-01';d.reference.data.judgments[0].deadline=null;
+ assert.equal(D.appealAvailability(d).status,'unknown');
+ d.reference.data.judgments[0].eligible=false;
+ assert.equal(D.appealAvailability(d).status,'unavailable');
+ assert.equal(D.validDemoDate('2026-02-30'),false);
+});
+test('direct filing prepopulates only an eligible matching case and judgment', () => {
+ const d=D.createLinkedDraft('cassation','APP-2026-2001','J-01');
+ assert.equal(d.route,'cassation');assert.equal(d.reference.judgment,'J-01');
+ assert.equal(d.reference.number,'APP-2026-2001');assert.equal(d.topic.main,'civil');
+ assert.ok(d.subtopics.length);assert.equal(d.topic.relatedCase,'');
+ assert.equal(d.topic.saved,false);assert.equal(d.topic.courtId,'');
+ assert.throws(()=>D.createLinkedDraft('appeal','APP-2026-2001','J-01'));
+ assert.throws(()=>D.createLinkedDraft('cassation','APP-2026-2001','J-02'));
+ assert.throws(()=>D.createLinkedDraft('initial','CASE-2026-1001','J-01'));
+ assert.throws(()=>D.createLinkedDraft('appeal','CASE-2026-1001','BAD'));
+});
+test('an expired draft cannot bypass eligibility at final submission', () => {
+ const d=D.createLinkedDraft('appeal','CASE-2026-1001','J-01');
+ d.demo.asOfDate='2026-11-21';
+ assert.ok(D.validateFinal(d).some(e=>e.field==='reference.judgment'&&e.message.includes('انتهت')));
+});
+test('filing links require a supported route and complete case and judgment identifiers', () => {
+ assert.deepEqual(D.parseFilingLink('#file?route=appeal&case=CASE-2026-1001&judgment=J-01'),{route:'appeal',number:'CASE-2026-1001',judgment:'J-01'});
+ assert.equal(D.parseFilingLink('#main'),null);
+ assert.throws(()=>D.parseFilingLink('#file?route=initial&case=CASE-2026-1001&judgment=J-01'));
+ assert.throws(()=>D.parseFilingLink('#file?route=appeal&case=CASE-2026-1001'));
+});

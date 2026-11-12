@@ -20,3 +20,60 @@
  .bottom-actions [data-action="back"]{grid-column:1;grid-row:1}
  .bottom-actions .btn.primary{grid-column:2;grid-row:1;margin:0}
 }
+
+/* Filing notifications and the main/subrequest hierarchy share the existing design tokens. */
+a.btn{text-decoration:none}
+.filing-panel{margin-bottom:28px}
+.filing-panel .panel-head{gap:16px;align-items:flex-start}
+.filing-panel .panel-head .help-text{margin-bottom:0}
+.filing-inbox-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(240px,1fr)}
+.filing-notification{display:flex;gap:12px;align-items:flex-start;padding:20px 24px;border-bottom:1px solid var(--line)}
+.filing-notification:last-child{border-bottom:0}
+.notification-icon{color:var(--brand);padding-top:4px}
+.notification-copy{flex:1;min-width:0}
+.notification-copy h3{font-size:14px}
+.notification-copy p{font-size:11px;margin:5px 0;color:var(--muted);overflow-wrap:anywhere}
+.notification-copy small{font-size:11px;color:var(--muted);display:block}
+.notification-actions{align-self:center;flex-shrink:0}
+.notification-actions .btn,.linked-cases .btn{min-height:40px}
+.linked-cases{border-inline-start:1px solid var(--line);background:#fafbfc;padding:20px 24px}
+.linked-cases h3{font-size:14px;margin-bottom:12px}
+.linked-cases article+article{margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+.linked-cases strong{font-size:13px;display:block}
+.linked-cases p,.linked-cases small{font-size:11px;color:var(--muted);margin:4px 0;display:block}
+.linked-cases .btn{margin-top:8px}
+.inbox-footnote{font-size:11px;color:var(--muted);border-top:1px solid var(--line);padding:12px 24px;margin:0}
+.filing-availability{margin-top:20px;padding:16px;border:1px solid var(--line);border-radius:8px;background:var(--canvas)}
+.filing-availability.success{background:var(--success-soft);border-color:#c6e0d3}
+.filing-availability.warn{background:#fcf4e6;border-color:#e8d7b7}
+.filing-availability.error{background:var(--danger-soft);border-color:#ebc2c5}
+.availability-heading{display:flex;align-items:center;gap:8px;font-size:14px}
+.availability-heading .badge{margin-inline-start:auto}
+.filing-availability.success .availability-heading{color:var(--success)}
+.filing-availability.warn .availability-heading{color:#805d22}
+.filing-availability.error .availability-heading{color:var(--danger)}
+.filing-availability p{font-size:12px;margin:8px 0 12px}
+.deadline-data{display:flex;gap:32px;flex-wrap:wrap;padding:12px 0;border-block:1px solid #63707b33}
+.deadline-data small{display:block;font-size:11px;color:var(--muted)}
+.deadline-data strong{display:block;font-size:18px}
+.simulation-note{display:block;font-size:10px;color:var(--muted);margin-top:12px}
+.case-overview{padding:24px;margin-bottom:28px}
+.case-judgments-title{margin-bottom:16px}
+.case-judgments{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.judgment-card{padding:24px}
+.judgment-card .filing-availability{margin:16px 0}
+.request-main-heading{display:flex;align-items:flex-start;gap:12px;margin-bottom:20px}
+.request-main-heading p{font-size:12px;color:var(--muted);margin:4px 0 0}
+.request-index{display:inline-grid;place-items:center;background:var(--brand-soft);color:var(--brand);width:26px;height:26px;border-radius:5px;font-size:12px;margin-inline-end:8px;flex-shrink:0}
+.topic-save-actions{margin-top:20px}
+.request-children{margin-top:24px;border-inline-start:3px solid #e6d3d9;padding-inline-start:20px}
+.request-rule{font-size:12px;color:var(--muted);margin:0 0 16px}
+.request-caption{text-align:start;color:var(--muted);font-size:11px;padding:10px 12px;background:#fafbfc}
+.subrequest-empty{text-align:center;padding:20px;font-size:12px;color:var(--muted);border:1px dashed var(--line);border-radius:7px}
+.review-main-topic{padding:16px;background:var(--canvas);border:1px solid var(--line);border-radius:7px}
+.review-main-topic h4{margin:8px 0 16px;font-size:15px}
+.request-children h4{font-size:14px;margin:0 0 12px}
+@media(max-width:1000px){.filing-notification{flex-wrap:wrap}.notification-actions{margin-inline-start:34px}.filing-inbox-grid{grid-template-columns:minmax(0,1fr) 240px}}
+@media(max-width:767px){.filing-inbox-grid,.case-judgments{grid-template-columns:1fr}.linked-cases{border-inline-start:0;border-top:1px solid var(--line)}.filing-panel .panel-head{flex-wrap:wrap}.filing-notification,.linked-cases{padding:16px}.notification-copy h3{font-size:13px}.inbox-footnote{padding:12px 16px}.judgment-card{padding:18px}.request-children{padding-inline-start:12px}.request-children .subtopic-form{padding:12px}.deadline-data{gap:16px}.deadline-data strong{font-size:16px}.filing-availability{padding:12px}.case-overview{padding:20px}.availability-heading{font-size:13px;flex-wrap:wrap}}
+@media(max-width:380px){.notification-icon{display:none}.notification-actions{margin-inline-start:0}.request-children{padding-inline-start:8px}.subtotal{gap:8px;flex-wrap:wrap}.case-overview .data-list{grid-template-columns:1fr}}
+@media print{.filing-availability,.request-hierarchy{break-inside:avoid}.notification-actions{display:none}}

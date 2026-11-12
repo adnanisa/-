@@ -19,6 +19,19 @@
    {id:'foreign',label:'وضع صيغة تنفيذية على حكم من دولة أجنبية',sub:['مبلغ محكوم به','مصروفات']},
    {id:'gcc',label:'وضع صيغة تنفيذية على حكم من مجلس التعاون',sub:['مبلغ محكوم به','مصروفات']}
   ],
+  // Fixed sample dates use the visible simulation clock, never an asserted legal time limit.
+  cases:[
+   {route:'appeal',number:'CASE-2026-1001',type:'مدنية',court:'الصغرى المدنية',state:'محسومة — تجريبية',original:'CASE-2026-1001',topic:'civil',
+    requests:[{name:'مطالبة مالية',amount:'1200.000'},{name:'تعويض عن ضرر مادي',amount:'250.000'}],
+    judgments:[{id:'J-01',label:'الحكم التجريبي الأول · 01/10/2026',date:'2026-10-01',deadline:'2026-11-20',eligible:true},
+     {id:'J-02',label:'الحكم التجريبي الثاني · 15/10/2026',date:'2026-10-15',deadline:'2026-11-14',eligible:true}]},
+   {route:'cassation',number:'APP-2026-2001',type:'مدنية',court:'محكمة الاستئناف العليا المدنية',state:'محسومة — تجريبية',original:'CASE-2026-1001',topic:'civil',
+    requests:[{name:'مطالبة مالية',amount:'1200.000'}],
+    judgments:[{id:'J-01',label:'الحكم الاستئنافي التجريبي الأول · 01/10/2026',date:'2026-10-01',deadline:'2026-11-18',eligible:true},
+     {id:'J-02',label:'الحكم الاستئنافي التجريبي الثاني · 15/10/2026',date:'2026-10-15',deadline:'2026-11-10',eligible:true},
+     {id:'J-03',label:'حكم غير متاح للتمييز — مثال تجريبي',date:'2026-10-20',deadline:'2026-11-20',eligible:false,reason:'حالة الحكم المحدد لا تتيح التمييز في هذا السيناريو.'},
+     {id:'J-04',label:'حكم بانتظار بيانات المدة — مثال تجريبي',date:'2026-10-21',deadline:null,eligible:true}]}
+  ],
   attachments:[
    {id:'identity',name:'نسخة من بطاقة الهوية أو مستخرج السجل التجاري للمدعي',required:true},
    {id:'statement',name:'بيان موضوع الدعوى ووقائعها وطلبات المدعي',required:true},
@@ -30,7 +43,8 @@
    {id:'expert',name:'تقارير الخبراء - إن وجدت',required:false},
    {id:'criminal',name:'الحكم الجنائي مع ما يفيد إعلانه وعدم استئنافه',required:false}
   ],
-  demoRules:{maxFileBytes:10*1024*1024,maxFilesPerCategory:3,extensions:['pdf','png','jpg','jpeg'],amountDecimals:3},
+  requestPolicy:{requiredCaseTypes:['مدنية','تجارية','دعاوى المطالبات الصغيرة - مدني','دعاوى الفواتير - مدني']},
+  demoRules:{asOfDate:'2026-11-12',maxFileBytes:10*1024*1024,maxFilesPerCategory:3,extensions:['pdf','png','jpg','jpeg'],amountDecimals:3},
   stepLabels:['مقدم الطلب','موضوع الدعوى','الأطراف','المرفقات والجلسة','المراجعة والتأكيد']
  };
  if(typeof module!=='undefined' && module.exports) module.exports=data;

@@ -11,7 +11,7 @@
    topic:{main:'',relatedCase:'',saved:false,courts:[],courtId:'',courtStatus:'idle'},
    subtopics:[],subEditor:{id:'',name:'',amount:''},parties:[],partyEditor:party(),
    files:[],session:'',ack:false,fee:{status:'idle',items:[]},payment:{status:'none',id:''},registration:null,
-   demo:{court:'single',fee:'payable',reference:'valid',payment:'success'}};
+   demo:{asOfDate:C.demoRules.asOfDate,court:'single',fee:'payable',reference:'valid',payment:'success'}};
  }
  function resolveCourts(courts){return {status:courts.length===1?'ready':courts.length>1?'choose':'empty',courtId:courts.length===1?courts[0].id:''};}
  function courtsFor(d){
@@ -44,10 +44,47 @@
   if(mode==='error')return {status:'error',message:'تعذر الاتصال بخدمة التحقق. يمكنك حفظ المسودة وإعادة المحاولة.'};
   if(mode==='missing')return {status:'missing',message:'لم نعثر على سجل تجريبي متاح بهذا الرقم.'};
   if(mode==='ineligible')return {status:'ineligible',message:'هذا الحكم غير متاح للطعن ضمن سيناريو التجربة المحدد.'};
-  const expected=route==='appeal'?'CASE-2026-1001':'APP-2026-2001';
-  if(String(number).trim().toUpperCase()!==expected)return {status:'invalid',message:'استخدم الرقم التجريبي '+expected+' لهذا المسار.'};
-  return {status:'verified',data:{number:expected,type:'مدنية',court:route==='appeal'?'الصغرى المدنية':'محكمة الاستئناف العليا المدنية',state:'محسومة - بيانات تجريبية',original:'CASE-2026-1001',judgments:[{id:'J-01',label:'الحكم التجريبي الأول · 01/10/2026'},{id:'J-02',label:'الحكم التجريبي الثاني · 15/10/2026'}],topic:'civil'}};
+  const record=C.cases.find(c=>c.route===route&&c.number===String(number).trim().toUpperCase());
+  if(!record)return {status:'invalid',message:'استخدم الرقم التجريبي '+(route==='appeal'?'CASE-2026-1001':'APP-2026-2001')+' لهذا المسار.'};
+  return {status:'verified',message:'',data:structuredClone(record)};
  }
+ function validDemoDate(value){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(value||''))return false;
+  const date=new Date(value+'T00:00:00Z');
+  return Number.isFinite(date.getTime())&&date.toISOString().slice(0,10)===value;
+ }
+ function appealAvailability(d,asOf=d.demo?.asOfDate||C.demoRules.asOfDate){
+  const base={allowed:false,status:'unverified',reason:'تحقق من مرجع القضية أولًا.',asOf,deadline:null,remainingDays:null};
+  if(d.route==='initial')return {...base,allowed:true,status:'not-applicable',reason:''};
+  if(d.reference.status!=='verified')return {...base,reason:d.reference.message||base.reason};
+  const judgment=d.reference.data?.judgments.find(j=>j.id===d.reference.judgment);
+  if(!judgment)return {...base,status:'unselected',reason:'اختر الحكم محل الطعن لعرض المدة وإمكانية التقديم.'};
+  const result={...base,judgment,deadline:judgment.deadline};
+  if(judgment.eligible!==true)return {...result,status:'unavailable',reason:judgment.reason||'الحكم المحدد غير متاح لهذا الإجراء في التجربة.'};
+  if(!validDemoDate(asOf)||!validDemoDate(judgment.deadline))return {...result,status:'unknown',reason:'بيانات المدة غير مكتملة. يتعذر تأكيد إمكانية التقديم؛ يمكنك حفظ المسودة.'};
+  const remainingDays=Math.round((Date.parse(judgment.deadline+'T00:00:00Z')-Date.parse(asOf+'T00:00:00Z'))/86400000);
+  if(remainingDays<0)return {...result,remainingDays,status:'expired',reason:'انتهت مدة التقديم في السيناريو التجريبي لهذا الحكم.'};
+  return {...result,remainingDays,allowed:true,status:remainingDays===0?'today':remainingDays<=3?'closing':'open',reason:remainingDays===0?'ينتهي التقديم اليوم وفق تاريخ المحاكاة.':remainingDays<=3?'اقترب انتهاء المدة المتاحة للتقديم.':'التقديم متاح لهذا الحكم في التجربة.'};
+ }
+ function minimumSubrequests(d){return d.route==='initial'&&C.requestPolicy.requiredCaseTypes.includes(d.caseType)?1:0;}
+ function referenceRequests(data){return (data?.requests||[]).map(s=>({...s,id:uid('SUB')}));}
+ function createLinkedDraft(route,number,judgment,demo={}){
+  if(!['appeal','cassation'].includes(route))throw new Error('رابط التقديم لا يحدد مسار طعن صالحًا.');
+  const d=createDraft(route);d.demo={...d.demo,...demo};
+  const result=lookupReference(route,number,d.demo.reference);
+  d.reference={number,...result,judgment};
+  const availability=appealAvailability(d);
+  if(!availability.allowed)throw new Error(availability.reason);
+  d.reference.number=result.data.number;d.caseType=result.data.type;d.topic.main=result.data.topic;
+  d.subtopics=referenceRequests(result.data);d.entry='linked';return d;
+ }
+ function parseFilingLink(hash){
+  if(!hash.startsWith('#file?'))return null;
+  const params=new URLSearchParams(hash.slice(6)),route=params.get('route'),number=params.get('case'),judgment=params.get('judgment');
+  if(!['appeal','cassation'].includes(route)||!number||!judgment)throw new Error('رابط التقديم غير مكتمل أو غير صالح. اختر القضية والحكم من لوحة الطلبات.');
+  return {route,number,judgment};
+ }
+
  function docsFor(d){
   if(d.route==='initial')return C.attachments;
   return [
@@ -83,6 +120,7 @@
    if(d.route!=='initial'){
     if(d.reference.status!=='verified')add('reference.number','تحقق من مرجع الدعوى أو الاستئناف قبل المواصلة.');
     if(!d.reference.judgment)add('reference.judgment','اختر الحكم محل الطعن.');
+    else {const availability=appealAvailability(d);if(!availability.allowed)add('reference.judgment',availability.reason);}
    }
    const a=d.applicant;
    if(!a.role)add('applicant.role','اختر صفة مقدم الطلب.');
@@ -96,12 +134,13 @@
   if(step===1){
    if(!C.topics.some(t=>t.id===d.topic.main))add('topic.main','اختر الموضوع الرئيسي.');
    if(d.route!=='initial'&&d.topic.main!==d.reference.data?.topic)add('topic.main','يجب أن يطابق الموضوع مرجع الطعن في هذا النموذج.');
+   if(d.subtopics.length<minimumSubrequests(d))add('subtopics','أضف طلبًا فرعيًا واحدًا على الأقل لهذا النوع من الدعاوى وفق سياسة التجربة.');
    const allowed=C.topics.find(t=>t.id===d.topic.main)?.sub||[];
-   if(d.subtopics.some(s=>!allowed.includes(s.name)))add('subtopics','راجع الموضوعات الفرعية بعد تغيير الموضوع الرئيسي.');
+   if(d.subtopics.some(s=>!allowed.includes(s.name)))add('subtopics','راجع الطلبات الفرعية بعد تغيير الموضوع الرئيسي.');
    if(!d.topic.saved)add('topic.main','احفظ الموضوع الرئيسي لتحديد المحكمة.');
    if(!d.topic.courtId||!d.topic.courts.some(c=>c.id===d.topic.courtId))add('topic.courtId','حدد المحكمة المختصة بعد حفظ الموضوع.');
-   if(d.subEditor.name||d.subEditor.amount)add('subEditor.name','أضف الموضوع الفرعي الجاري إدخاله أو ألغِ إدخاله قبل المواصلة.');
-   if(d.subtopics.some(x=>toFils(x.amount)===null))add('subtopics','راجع مبالغ الموضوعات الفرعية.');
+   if(d.subEditor.name||d.subEditor.amount)add('subEditor.name','أضف الطلب الفرعي الجاري إدخاله أو ألغِ إدخاله قبل المواصلة.');
+   if(d.subtopics.some(x=>toFils(x.amount)===null))add('subtopics','راجع مبالغ الطلبات الفرعية.');
   }
   if(step===2){
    if(!d.parties.length)add('parties','أضف أطراف الطلب قبل المواصلة.');
@@ -125,6 +164,6 @@
   d.status='registered';d.registration={number:uid('SIM-CASE'),date:new Date().toISOString()};return d;
  }
  function escape(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
- const api={uid,address,party,createDraft,resolveCourts,courtsFor,normalizeDigits,toFils,money,feesFor,finalAction,invalidate,lookupReference,docsFor,validateParty,validateStep,validateFinal,canStartPayment,completeRegistration,escape};
+ const api={uid,address,party,createDraft,resolveCourts,courtsFor,normalizeDigits,toFils,money,feesFor,finalAction,invalidate,lookupReference,validDemoDate,appealAvailability,minimumSubrequests,referenceRequests,createLinkedDraft,parseFilingLink,docsFor,validateParty,validateStep,validateFinal,canStartPayment,completeRegistration,escape};
  if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.LawsuitDomain=api;
 })(typeof window==='undefined'?globalThis:window);

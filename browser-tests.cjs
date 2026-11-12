@@ -22,7 +22,7 @@ let passed=0;
  async function fill(p){await act(p,'demo').click();await act(p,'fill-demo').click();}
  async function scenario(p,changes){
   await act(p,'demo').click();
-  for(const [k,v] of Object.entries(changes))await p.locator('#modal [data-bind="demo.'+k+'"]').selectOption(v);
+  for(const [k,v] of Object.entries(changes)){const input=p.locator('#modal [data-bind="demo.'+k+'"]');if(k==='asOfDate')await input.fill(v);else await input.selectOption(v);}
   await act(p,'apply-demo').click();
  }
  async function next(p,title){await act(p,'next').click();await expect(p.locator('#step-heading')).toHaveText(title);await expect(p.locator('#main')).not.toHaveAttribute('aria-busy','true');}
@@ -44,7 +44,7 @@ let passed=0;
   await next(p,'راجع طلبك قبل التأكيد');
   await expect(p.locator('.fee-total')).toBeVisible();
  }
- async function run(name,fn){await fn();passed++;console.log('PASS '+name);}
+ async function run(name,fn){if(process.env.TEST_FILTER&&!name.includes(process.env.TEST_FILTER))return;await fn();passed++;console.log('PASS '+name);}
  try{
   await run('conditional applicant, incomplete save and cross-reload resume',async()=>{
    const p=await fresh();await create(p);
@@ -173,7 +173,7 @@ let passed=0;
    await act(p,'save-topic').click();await expect(p.locator('#court-result')).toContainText('لا توجد محكمة');
    await act(p,'next').click();await expect(p.locator('#error-summary')).toBeVisible();
    await scenario(p,{court:'error'});await act(p,'save-topic').click();await expect(p.locator('#court-result')).toContainText('تعذر جلب');
-   await scenario(p,{court:'single',payment:'failure'});await act(p,'save-topic').click();
+   await scenario(p,{court:'single',payment:'failure'});await fill(p);await act(p,'save-topic').click();
    await next(p,'أطراف الدعوى');await fill(p);await next(p,'المرفقات وطريقة الجلسة');await fill(p);
    await next(p,'راجع طلبك قبل التأكيد');await field(p,'ack').check();await act(p,'final').click();await act(p,'confirm-payment').click();
    await expect(p.locator('#step-heading')).toHaveText('راجع طلبك قبل التأكيد');
