@@ -3,10 +3,11 @@
 <head>
  <meta charset="utf-8">
  <meta name="viewport" content="width=device-width,initial-scale=1">
- <meta name="theme-color" content="#762438">
+ <meta name="theme-color" content="#072f59">
  <meta name="description" content="نموذج تفاعلي تجريبي لخدمة رفع دعوى قضائية — ابتدائي، استئناف، تمييز.">
  <title>رفع دعوى قضائية | الخدمات العدلية</title>
  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+ <link rel="stylesheet" href="fonts.css">
  <link rel="stylesheet" href="styles.css">
  <script defer src="data.js"></script>
  <script defer src="logic.js"></script>
@@ -20,11 +21,15 @@
  <header class="site-header">
   <div class="header-inner">
    <button class="brand" data-action="home" aria-label="الخدمات العدلية — ملفاتي">
-    <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none"><path d="M24 7v31M12 39h24M8 16h32M24 7l3 5h-6l3-5Z" stroke="currentColor" stroke-width="2"/><path d="m12 16-7 13h14l-7-13Zm24 0-7 13h14l-7-13Z" stroke="currentColor" stroke-width="1.7"/><path d="M5 29c1 8 13 8 14 0M29 29c1 8 13 8 14 0" fill="currentColor"/></svg></span>
-    <span><strong>الخدمات العدلية</strong><small>مملكة البحرين · وزارة العدل</small></span>
+    <span class="brand-mark" aria-hidden="true"><img src="bahrain-flag.svg" alt="" width="38" height="25"></span>
+    <span class="brand-copy"><small>مملكة البحرين</small><strong>وزارة العدل والشؤون الإسلامية والأوقاف</strong><span>الخدمات العدلية · رفع دعوى قضائية</span></span>
    </button>
-   <nav aria-label="التنقل الرئيسي"><button data-action="home" class="nav-link current">ملفاتي</button><button data-action="guide" class="nav-link">دليل الخدمة</button></nav>
-   <div class="header-user"><span class="avatar" aria-hidden="true">ت</span><span><strong>مستخدم تجريبي</strong><small>جلسة eKey2 تجريبية</small></span></div>
+  </div>
+  <div class="service-bar">
+   <div class="service-bar-inner">
+    <nav aria-label="التنقل الرئيسي"><button data-action="home" class="nav-link current">ملفاتي</button><button data-action="guide" class="nav-link">دليل الخدمة</button></nav>
+    <div class="header-user"><span class="avatar" aria-hidden="true">ت</span><span><strong>مستخدم تجريبي</strong><small>جلسة eKey2 تجريبية</small></span></div>
+   </div>
   </div>
  </header>
  <main id="main" tabindex="-1"><div class="initial-loading" role="status">جارٍ تجهيز الخدمة…</div></main>
