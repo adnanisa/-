@@ -2,16 +2,44 @@
  'use strict';
  const C=typeof module!=='undefined'&&module.exports?require('./data.js'):root.LawsuitData;
  const uid=prefix=>prefix+'-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,6).toUpperCase();
+ // Display numbers are illustrative; legacy IndexedDB keys remain unchanged.
+ function caseNumber(d){
+  const registered=d.status==='registered';
+  if(!registered&&/^\d{10}$/.test(d.caseNumber||''))return d.caseNumber;
+  if(registered){
+   for(const number of [d.registration?.number,d.caseNumber])if(/^\d{2}\/\d{4}\/\d{5}\/\d$/.test(number||''))return number;
+  }
+  let hash=2166136261;for(const c of String(d.id))hash=Math.imul(hash^c.charCodeAt(0),16777619)>>>0;
+  if(!registered)return '3'+String(hash%1000000000).padStart(9,'0');
+  const digits=String(hash%1000000).padStart(6,'0');
+  return ({initial:'01',appeal:'02',cassation:'03'}[d.route]||'01')+'/'+(d.year||String(d.updatedAt||'2026').slice(0,4))+'/'+digits.slice(0,5)+'/'+digits.slice(5);
+ }
+ function filingNotifications(demo={},filters={}){
+  const q=normalizeDigits(filters.query||'').toLowerCase();
+  return C.cases.flatMap(record=>record.judgments.map(judgment=>({record,judgment,availability:appealAvailability({route:record.route,reference:{status:'verified',data:record,judgment:judgment.id},demo})})))
+   .filter(({record,judgment,availability:a})=>(!filters.route||filters.route==='all'||record.route===filters.route)&&
+    (!q||[record.number,record.type,record.court,judgment.label,C.routes[record.route].label].join(' ').toLowerCase().includes(q))&&
+    (!filters.remaining||filters.remaining==='all'||(filters.remaining==='available'?a.allowed:filters.remaining==='expired'?a.status==='expired':filters.remaining==='unavailable'?!a.allowed&&a.status!=='expired':a.allowed&&a.remainingDays<=Number(filters.remaining))))
+   .sort((a,b)=>Number(b.availability.allowed)-Number(a.availability.allowed)||(a.availability.remainingDays??Infinity)-(b.availability.remainingDays??Infinity)||a.record.number.localeCompare(b.record.number));
+ }
+ function lookupPartyIdentity(type,identity,mode='valid'){
+  const source=type==='personal'?'الإحصاء':type==='company'?'السجلات التجارية':'';
+  if(!source)return {status:'invalid',message:'اختر نوع هوية يدعم الاسترجاع.'};
+  if(mode==='error')return {status:'error',source,message:'تعذر استرجاع البيانات من '+source+' في المحاكاة. أعد المحاولة.'};
+  const data=mode==='missing'?null:C.identityRecords[type].find(p=>p.identity===normalizeDigits(identity).toUpperCase());
+  return data?{status:'verified',source,identity:data.identity,data:structuredClone(data),message:'تم استرجاع بيانات تجريبية من '+source+'.'}:{status:'missing',source,message:'لم يعثر على بيانات مطابقة في سجل التجربة. راجع الرقم وأعد المحاولة.'};
+ }
  const address=()=>({location:'local',flat:'',building:'',alpha:'',road:'',block:'',country:'',city:'',detail:''});
- function party(){return {id:'',identityType:'personal',identity:'',name:'',gender:'',nationality:'',role:'',mobile:'',email:'',address:address()};}
+ function party(){return {id:'',lookup:{status:'idle'},identityType:'personal',identity:'',name:'',gender:'',nationality:'',role:'',mobile:'',email:'',address:address()};}
  function createDraft(route='initial'){
-  return {id:uid('DRAFT'),revision:0,route,step:0,maxStep:0,status:'draft',updatedAt:null,
+  const id=uid('DRAFT');
+  return {id,caseNumber:caseNumber({id,route,year:new Date().getFullYear()}),revision:0,route,step:0,maxStep:0,status:'draft',updatedAt:null,
    applicant:{name:'مستخدم تجريبي',personalId:'DEMO-USER-01',role:'self',agency:'',government:'',mobile:'',email:'',confirmEmail:'',address:address()},
    caseType:'',reference:{number:'',status:'idle',judgment:'',data:null},
    topic:{main:'',relatedCase:'',saved:false,courts:[],courtId:'',courtStatus:'idle'},
    subtopics:[],subEditor:{id:'',name:'',amount:''},parties:[],partyEditor:party(),
    files:[],session:'',ack:false,fee:{status:'idle',items:[]},payment:{status:'none',id:''},registration:null,
-   demo:{asOfDate:C.demoRules.asOfDate,court:'single',fee:'payable',reference:'valid',payment:'success'}};
+   demo:{asOfDate:C.demoRules.asOfDate,court:'single',fee:'payable',reference:'valid',payment:'success',identity:'valid'}};
  }
  function resolveCourts(courts){return {status:courts.length===1?'ready':courts.length>1?'choose':'empty',courtId:courts.length===1?courts[0].id:''};}
  function courtsFor(d){
@@ -44,8 +72,10 @@
   if(mode==='error')return {status:'error',message:'تعذر الاتصال بخدمة التحقق. يمكنك حفظ المسودة وإعادة المحاولة.'};
   if(mode==='missing')return {status:'missing',message:'لم نعثر على سجل تجريبي متاح بهذا الرقم.'};
   if(mode==='ineligible')return {status:'ineligible',message:'هذا الحكم غير متاح للطعن ضمن سيناريو التجربة المحدد.'};
-  const record=C.cases.find(c=>c.route===route&&c.number===String(number).trim().toUpperCase());
-  if(!record)return {status:'invalid',message:'استخدم الرقم التجريبي '+(route==='appeal'?'CASE-2026-1001':'APP-2026-2001')+' لهذا المسار.'};
+  const aliases={'CASE-2026-1001':'01/2026/01001/1','APP-2026-2001':'02/2026/02001/1'};
+  const key=normalizeDigits(number).toUpperCase();
+  const record=C.cases.find(c=>c.route===route&&c.number===(aliases[key]||key));
+  if(!record)return {status:'invalid',message:'استخدم الرقم التجريبي '+(route==='appeal'?'01/2026/01001/1':'02/2026/02001/1')+' لهذا المسار.'};
   return {status:'verified',message:'',data:structuredClone(record)};
  }
  function validDemoDate(value){
@@ -103,6 +133,8 @@
  }
  function validateParty(p,d){
   const e=[];const add=(f,m)=>e.push({field:'partyEditor.'+f,message:m});
+  if(!C.identityTypes.some(t=>t.id===p.identityType))add('identityType','اختر نوع الهوية من القائمة.');
+  if(p.identityType==='government'&&!C.governmentEntities.some(g=>g.id===p.identity&&g.label===p.name))add('identity','اختر الهيئة الحكومية من القائمة.');
   if(!present(p.identity))add('identity','أدخل رقم هوية الطرف.');
   if(!present(p.name))add('name','أدخل اسم الطرف.');
   if(!C.routes[d.route].roles.includes(p.role))add('role','اختر صفة الطرف.');
@@ -161,9 +193,9 @@
  function canStartPayment(d){return !['pending','paid'].includes(d.payment.status)&&d.status!=='registered';}
  function completeRegistration(d){
   if(d.registration)return d;
-  d.status='registered';d.registration={number:uid('SIM-CASE'),date:new Date().toISOString()};return d;
+  d.status='registered';d.registration={number:caseNumber(d),date:new Date().toISOString()};return d;
  }
  function escape(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
- const api={uid,address,party,createDraft,resolveCourts,courtsFor,normalizeDigits,toFils,money,feesFor,finalAction,invalidate,lookupReference,validDemoDate,appealAvailability,minimumSubrequests,referenceRequests,createLinkedDraft,parseFilingLink,docsFor,validateParty,validateStep,validateFinal,canStartPayment,completeRegistration,escape};
+ const api={caseNumber,filingNotifications,lookupPartyIdentity,uid,address,party,createDraft,resolveCourts,courtsFor,normalizeDigits,toFils,money,feesFor,finalAction,invalidate,lookupReference,validDemoDate,appealAvailability,minimumSubrequests,referenceRequests,createLinkedDraft,parseFilingLink,docsFor,validateParty,validateStep,validateFinal,canStartPayment,completeRegistration,escape};
  if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.LawsuitDomain=api;
 })(typeof window==='undefined'?globalThis:window);

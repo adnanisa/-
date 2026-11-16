@@ -39,10 +39,10 @@ test('changing material information invalidates court, fees and acknowledgement'
  assert.equal(d.fee.status,'idle'); assert.equal(d.ack,false);
 });
 test('appeal and cassation references require distinct demo identifiers', () => {
- assert.equal(D.lookupReference('appeal','CASE-2026-1001','valid').status,'verified');
- assert.equal(D.lookupReference('cassation','CASE-2026-1001','valid').status,'invalid');
- assert.equal(D.lookupReference('cassation','APP-2026-2001','valid').status,'verified');
- assert.equal(D.lookupReference('appeal','CASE-2026-1001','ineligible').status,'ineligible');
+ assert.equal(D.lookupReference('appeal','01/2026/01001/1','valid').status,'verified');
+ assert.equal(D.lookupReference('cassation','01/2026/01001/1','valid').status,'invalid');
+ assert.equal(D.lookupReference('cassation','02/2026/02001/1','valid').status,'verified');
+ assert.equal(D.lookupReference('appeal','01/2026/01001/1','ineligible').status,'ineligible');
 });
 test('final validation cannot bypass earlier steps or reference verification', () => {
  const d=D.createDraft('appeal');
@@ -98,7 +98,7 @@ test('required subrequests depend on case type and do not block optional cases',
  assert.equal(D.validateStep(d,1).length,0);
 });
 test('appeal availability follows the selected judgment and exact demo calendar day', () => {
- const d=D.createDraft('appeal');d.reference={number:'CASE-2026-1001',...D.lookupReference('appeal','CASE-2026-1001','valid'),judgment:'J-01'};
+ const d=D.createDraft('appeal');d.reference={number:'01/2026/01001/1',...D.lookupReference('appeal','01/2026/01001/1','valid'),judgment:'J-01'};
  assert.equal(D.appealAvailability(d,'2026-11-12').remainingDays,8);
  d.reference.judgment='J-02';assert.equal(D.appealAvailability(d,'2026-11-12').status,'closing');
  assert.equal(D.appealAvailability(d,'2026-11-14').status,'today');
@@ -112,24 +112,24 @@ test('appeal availability follows the selected judgment and exact demo calendar 
  assert.equal(D.validDemoDate('2026-02-30'),false);
 });
 test('direct filing prepopulates only an eligible matching case and judgment', () => {
- const d=D.createLinkedDraft('cassation','APP-2026-2001','J-01');
+ const d=D.createLinkedDraft('cassation','02/2026/02001/1','J-01');
  assert.equal(d.route,'cassation');assert.equal(d.reference.judgment,'J-01');
- assert.equal(d.reference.number,'APP-2026-2001');assert.equal(d.topic.main,'civil');
+ assert.equal(d.reference.number,'02/2026/02001/1');assert.equal(d.topic.main,'civil');
  assert.ok(d.subtopics.length);assert.equal(d.topic.relatedCase,'');
  assert.equal(d.topic.saved,false);assert.equal(d.topic.courtId,'');
- assert.throws(()=>D.createLinkedDraft('appeal','APP-2026-2001','J-01'));
- assert.throws(()=>D.createLinkedDraft('cassation','APP-2026-2001','J-02'));
- assert.throws(()=>D.createLinkedDraft('initial','CASE-2026-1001','J-01'));
- assert.throws(()=>D.createLinkedDraft('appeal','CASE-2026-1001','BAD'));
+ assert.throws(()=>D.createLinkedDraft('appeal','02/2026/02001/1','J-01'));
+ assert.throws(()=>D.createLinkedDraft('cassation','02/2026/02001/1','J-02'));
+ assert.throws(()=>D.createLinkedDraft('initial','01/2026/01001/1','J-01'));
+ assert.throws(()=>D.createLinkedDraft('appeal','01/2026/01001/1','BAD'));
 });
 test('an expired draft cannot bypass eligibility at final submission', () => {
- const d=D.createLinkedDraft('appeal','CASE-2026-1001','J-01');
+ const d=D.createLinkedDraft('appeal','01/2026/01001/1','J-01');
  d.demo.asOfDate='2026-11-21';
  assert.ok(D.validateFinal(d).some(e=>e.field==='reference.judgment'&&e.message.includes('انتهت')));
 });
 test('filing links require a supported route and complete case and judgment identifiers', () => {
- assert.deepEqual(D.parseFilingLink('#file?route=appeal&case=CASE-2026-1001&judgment=J-01'),{route:'appeal',number:'CASE-2026-1001',judgment:'J-01'});
+ assert.deepEqual(D.parseFilingLink('#file?route=appeal&case=01/2026/01001/1&judgment=J-01'),{route:'appeal',number:'01/2026/01001/1',judgment:'J-01'});
  assert.equal(D.parseFilingLink('#main'),null);
- assert.throws(()=>D.parseFilingLink('#file?route=initial&case=CASE-2026-1001&judgment=J-01'));
- assert.throws(()=>D.parseFilingLink('#file?route=appeal&case=CASE-2026-1001'));
+ assert.throws(()=>D.parseFilingLink('#file?route=initial&case=01/2026/01001/1&judgment=J-01'));
+ assert.throws(()=>D.parseFilingLink('#file?route=appeal&case=01/2026/01001/1'));
 });

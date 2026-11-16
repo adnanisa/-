@@ -2,14 +2,15 @@
 'use strict';
 const C=window.LawsuitData,D=window.LawsuitDomain,U=window.LawsuitUI,Store=window.LawsuitStore;
 const main=document.getElementById('main'),modal=document.getElementById('modal');
-const state={draft:null,items:[],screen:'dashboard',errors:[],dirty:false,busy:false,version:0,storageError:'',demoDefaults:{asOfDate:C.demoRules.asOfDate,court:'single',fee:'payable',reference:'valid',payment:'success'}};
+const state={draft:null,items:[],screen:'dashboard',errors:[],dirty:false,busy:false,version:0,storageError:'',filingFilters:{query:'',route:'all',remaining:'all'},demoDefaults:{asOfDate:C.demoRules.asOfDate,court:'single',fee:'payable',reference:'valid',payment:'success',identity:'valid'}};
 let toastTimer,confirmCallback,lastFocus;
 function toast(message,error=false){
  const el=document.getElementById('toast');el.textContent=message;el.className='toast visible'+(error?' error':'');
  clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('visible'),4500);
 }
 function render(focus=false){
- if(state.screen==='dashboard')main.innerHTML=U.dashboard(state.items,state.storageError,state.demoDefaults);
+ if(state.screen==='dashboard')main.innerHTML=U.dashboard(state.items,state.storageError,state.demoDefaults,state.filingFilters);
+ else if(state.screen==='file')main.innerHTML=U.draftPage(state.draft);
  else if(state.screen==='case')main.innerHTML=U.casePage(state.caseRecord,state.demoDefaults);
  else if(state.screen==='result')main.innerHTML=U.result(state.draft);
  else main.innerHTML=U.wizard(state.draft,state.errors,state.busy);
@@ -49,7 +50,7 @@ async function home(){
 }
 function goHome(){
  if(state.dirty&&state.draft&&state.draft.status!=='registered'){
-  openDialog(U.modal('لديك تغييرات غير محفوظة','<p>احفظ تقدمك قبل العودة إلى طلباتك، أو اخرج دون حفظ التغييرات الأخيرة.</p>',U.btn('البقاء هنا','close-modal','secondary')+U.btn('خروج دون حفظ','discard-home','secondary')+U.btn('حفظ والخروج','save-exit','primary')));
+  openDialog(U.modal('لديك تغييرات غير محفوظة','<p>احفظ تقدمك قبل العودة إلى ملفاتك، أو اخرج دون حفظ التغييرات الأخيرة.</p>',U.btn('البقاء هنا','close-modal','secondary')+U.btn('خروج دون حفظ','discard-home','secondary')+U.btn('حفظ والخروج','save-exit','primary')));
  }else home();
 }
 function setPath(object,path,value){
@@ -64,7 +65,15 @@ function boundChange(el,refresh=false){
  const value=el.type==='checkbox'?el.checked:el.value;
  if(old===value){if(refresh)render();return;}
  if(path==='ack'){d.ack=value;state.dirty=true;state.version++;const b=main.querySelector('[data-action="final"]');if(b)b.disabled=!value||D.finalAction(d.fee)==='unavailable'||!D.appealAvailability(d).allowed;return;}
- setPath(d,path,value);changed();state.errors=state.errors.filter(x=>x.field!==path);
+ setPath(d,path,value);
+ if(path==='partyEditor.identityType')d.partyEditor={...D.party(),id:d.partyEditor.id,role:d.partyEditor.role,identityType:value};
+ if(path==='partyEditor.identity'){
+  const p=d.partyEditor;p.name='';p.gender='';p.nationality='';p.lookup={status:'idle'};
+  if(p.identityType==='government'){const entity=C.governmentEntities.find(g=>g.id===value);p.name=entity?.label||'';}
+  for(const key of ['name','gender','nationality']){const field=document.getElementById(U.fieldId('partyEditor.'+key));if(field)field.value=p[key];}
+  document.getElementById('identity-result')?.replaceChildren();
+ }
+ changed();state.errors=state.errors.filter(x=>x.field!==path);
  if(path==='reference.number'){d.reference.status='idle';d.reference.data=null;d.reference.judgment='';d.reference.message='';d.subtopics=[];d.topic.main='';d.entry='';D.invalidate(d,'court');document.getElementById('reference-result')?.replaceChildren();}
  else if(path==='caseType'||path==='topic.main'||path==='topic.relatedCase'||path==='reference.judgment')D.invalidate(d,'court');
  else if(path==='topic.courtId'){d.session='';D.invalidate(d);}
@@ -75,22 +84,31 @@ document.addEventListener('input',event=>{
  const el=event.target;
  if(el.matches('[data-bind]')&&!el.matches('select,[type=radio],[type=checkbox]'))boundChange(el);
  if(el.id==='draft-search')filterDrafts();
+ if(el.id==='filing-search')filterNotifications();
 });
 document.addEventListener('change',event=>{
  const el=event.target;
  if(el.dataset.category&&el.type==='file'){uploadFiles(el);return;}
- if(el.id==='draft-filter'){filterDrafts();return;}
+ if(['draft-filter','case-type-filter'].includes(el.id)){filterDrafts();return;}
+ if(['filing-route','filing-remaining'].includes(el.id)){filterNotifications();return;}
  if(el.matches('[data-bind]')){
   const path=el.dataset.bind;
-  boundChange(el,['applicant.role','applicant.address.location','partyEditor.identityType','partyEditor.address.location','topic.main','topic.courtId','reference.judgment'].includes(path));
+  boundChange(el,['applicant.role','applicant.address.location','partyEditor.identityType','partyEditor.address.location','topic.main','topic.courtId','reference.judgment'].includes(path)||(path==='partyEditor.identity'&&el.tagName==='SELECT'));
   // Text fields have already updated on input; refresh conditional address controls on radio change.
  }
 });
+function filterNotifications(){
+ state.filingFilters={query:document.getElementById('filing-search').value,route:document.getElementById('filing-route').value,remaining:document.getElementById('filing-remaining').value};
+ document.getElementById('filing-notifications').innerHTML=U.filingNotificationRows(state.demoDefaults,state.filingFilters);
+ document.getElementById('filing-count').textContent=D.filingNotifications(state.demoDefaults,state.filingFilters).length+' إشعار';
+}
 function filterDrafts(){
- const q=(document.getElementById('draft-search')?.value||'').toLowerCase();
- const filter=document.getElementById('draft-filter')?.value||'all';
- const items=state.items.filter(d=>(filter==='all'||(filter==='draft'?d.status!=='registered':d.status==='registered'))&&(d.id+' '+U.topicLabel(d)+' '+d.caseType).toLowerCase().includes(q));
- document.getElementById('draft-rows').innerHTML=U.draftRows(items);
+ const q=D.normalizeDigits(document.getElementById('draft-search')?.value||'').toLowerCase();
+ const filter=document.getElementById('draft-filter')?.value||'all',type=document.getElementById('case-type-filter')?.value||'all';
+ const items=state.items.filter(d=>(filter==='all'||(filter==='draft'?d.status!=='registered':filter==='registered'?d.status==='registered':false))&&(type==='all'||d.caseType===type)&&[D.caseNumber(d),U.topicLabel(d),d.caseType,d.topic.courts.find(c=>c.id===d.topic.courtId)?.name].join(' ').toLowerCase().includes(q));
+ const records=C.cases.filter(c=>['all','linked'].includes(filter)&&(type==='all'||c.type===type)&&[c.number,c.court,c.type,U.topicLabel({topic:{main:c.topic}})].join(' ').toLowerCase().includes(q));
+ document.getElementById('draft-rows').innerHTML=U.draftRows(items,records);
+ document.getElementById('files-count').textContent=items.length+records.length;
 }
 async function create(route){
  const d=D.createDraft(route);d.demo={...d.demo,...state.demoDefaults};state.draft=d;state.screen='wizard';state.dirty=true;state.errors=[];state.version++;
@@ -98,13 +116,15 @@ async function create(route){
 }
 async function resume(id){
  const d=await Store.get(id);if(!d){toast('هذه المسودة لم تعد متاحة.',true);await home();return;}
- d.demo={asOfDate:C.demoRules.asOfDate,...d.demo};
+ d.caseNumber=D.caseNumber(d);d.partyEditor.lookup||={status:'idle'};
+ d.demo={asOfDate:C.demoRules.asOfDate,identity:'valid',...d.demo};
  state.draft=d;state.dirty=false;state.errors=[];state.version++;
  if(d.status==='registered'||['pending','paid'].includes(d.payment.status)){state.screen='result';render(true);return;}
  // Retain entries, but recheck simulated references/court and fees instead of trusting stale results.
  if(d.route!=='initial'&&d.reference.status==='verified'){
   const r=D.lookupReference(d.route,d.reference.number,d.demo.reference);
   d.reference={...d.reference,data:null,...r};
+  if(r.status==='verified')d.reference.number=r.data.number;
   if(r.status==='verified'&&!d.subtopics.length)d.subtopics=D.referenceRequests(r.data);
   if(!D.appealAvailability(d).allowed){D.invalidate(d,'court');d.step=0;}
  }
@@ -139,11 +159,12 @@ async function fetchCourts(){
 }
 async function saveTopic(){
  const d=state.draft;
- if(!C.topics.some(t=>t.id===d.topic.main)){showErrors([{field:'topic.main',message:'اختر الموضوع الرئيسي.',step:1}]);return;}
+ const topicErrors=D.validateStep(d,1).filter(e=>e.field!=='topic.courtId'&&e.message!=='احفظ الموضوع الرئيسي لتحديد المحكمة.');
+ if(topicErrors.length){showErrors(topicErrors);return;}
  await busyWork(async()=>{
   D.invalidate(d);d.topic.saved=true;d.topic.courtStatus='loading';state.errors=[];
   if(!(await persist(true))){d.topic.saved=false;d.topic.courtStatus='idle';render();return;}
-  await fetchCourts();toast('حُفظ الموضوع الرئيسي وتم تحديث نتيجة المحكمة.');
+  await fetchCourts();toast('حُفظ الموضوع والمواضيع الفرعية وتم تحديث نتيجة المحكمة.');
  });
 }
 function addSubtopic(){
@@ -155,7 +176,17 @@ function addSubtopic(){
  if(errors.length){showErrors(errors);return;}
  const item={id:s.id||D.uid('SUB'),name:s.name,amount:D.normalizeDigits(s.amount)};
  const i=d.subtopics.findIndex(x=>x.id===s.id);if(i>=0)d.subtopics[i]=item;else d.subtopics.push(item);
- d.subEditor={id:'',name:'',amount:''};D.invalidate(d,'court');changed();state.errors=[];render();toast('أضيف الطلب الفرعي. احفظ الموضوع الرئيسي لتحديث المحكمة.');
+ d.subEditor={id:'',name:'',amount:''};D.invalidate(d,'court');changed();state.errors=[];render();toast('أضيف الطلب الفرعي. احفظ الموضوع والمحكمة المختصة لتحديث المحكمة.');
+}
+async function lookupParty(){
+ const d=state.draft,p=d.partyEditor;
+ if(!p.identity.trim()){showErrors([{field:'partyEditor.identity',message:'أدخل رقم الهوية لاسترجاع بيانات الطرف.',step:2}]);return;}
+ await busyWork(async()=>{
+  p.name='';p.lookup={status:'loading'};render();await delay();
+  p.lookup=D.lookupPartyIdentity(p.identityType,p.identity,d.demo.identity||'valid');
+  if(p.lookup.status==='verified')Object.assign(p,p.lookup.data);
+  changed();state.errors=[];render();
+ });
 }
 function addParty(){
  const d=state.draft,errors=D.validateParty(d.partyEditor,d);
@@ -275,7 +306,7 @@ async function fillDemo(){
   d.applicant.agency='DEMO-AGENCY-01';d.applicant.government=C.governments[0];
   d.applicant.address={...D.address(),flat:'12',building:'100',road:'200',block:'300'};
   if(d.route!=='initial'){
-   d.reference.number=d.route==='appeal'?'CASE-2026-1001':'APP-2026-2001';
+   d.reference.number=d.route==='appeal'?'01/2026/01001/1':'02/2026/02001/1';
    const r=D.lookupReference(d.route,d.reference.number,d.demo.reference);d.reference={...d.reference,...r,judgment:r.status==='verified'?'J-01':''};
    if(r.status==='verified'){d.topic.main=r.data.topic;d.subtopics=D.referenceRequests(r.data);}
   }
@@ -284,7 +315,7 @@ async function fillDemo(){
   if(d.route==='initial')d.subtopics=[{id:D.uid('SUB'),name:'مطالبة مالية',amount:'1200.000'},{id:D.uid('SUB'),name:'تعويض عن ضرر مادي',amount:'250.000'}];
   D.invalidate(d,'court');
  }else if(d.step===2){
-  d.parties=C.routes[d.route].roles.map((role,i)=>({...D.party(),id:D.uid('PARTY'),identity:'DEMO-ID-00'+(i+1),name:i?'شركة المثال التجريبية':'طرف تجريبي أول',identityType:i?'company':'personal',gender:i?'':'ذكر',nationality:i?'':'بحريني',role,mobile:'+973 30000000',email:'party'+i+'@example.com',address:{...D.address(),building:'100',road:'200',block:'300'}}));
+  d.parties=C.routes[d.route].roles.map((role,i)=>({...D.party(),id:D.uid('PARTY'),identity:i?'DEMO-CR-001':'DEMO-ID-001',name:i?'شركة المثال التجريبية':'طرف تجريبي أول',identityType:i?'company':'personal',gender:i?'':'ذكر',nationality:i?'':'بحريني',role,mobile:'+973 30000000',email:'party'+i+'@example.com',address:{...D.address(),building:'100',road:'200',block:'300'}}));
   d.partyEditor=D.party();
  }else if(d.step===3){
   const blob=demoPdf();
@@ -312,6 +343,7 @@ const handlers={
  'home':goHome,'reload-home':home,
  'view-case':el=>{const record=C.cases.find(c=>c.number===el.dataset.number);if(record){state.caseRecord=record;state.screen='case';render(true);}},
  'resume':el=>resume(el.dataset.id),
+ 'view-file':async el=>{const d=await Store.get(el.dataset.id);if(!d){toast('الملف غير متاح.',true);return;}state.draft=d;state.dirty=false;state.screen='file';render(true);},
  'close-modal':closeDialog,
  'confirm-action':()=>{const f=confirmCallback;confirmCallback=null;closeDialog();f?.();},
  'guide':()=>openDialog(U.guideModal()),
@@ -321,8 +353,8 @@ const handlers={
  'delete-draft':el=>confirmDialog('حذف المسودة','سيتم حذف المسودة ومرفقاتها من هذا المتصفح. لا يمكن التراجع عن الحذف.',async()=>{await Store.remove(el.dataset.id);await home();toast('حُذفت المسودة.');},'حذف المسودة'),
  'save':()=>busyWork(async()=>{if(await persist())render();}),
  'save-exit':()=>busyWork(async()=>{if(await persist()){closeDialog();await home();}}),
- 'save-copy':()=>busyWork(async()=>{state.draft.id=D.uid('DRAFT');state.draft.revision=0;state.draft.updatedAt=null;closeDialog();if(await persist())render();}),
- 'lookup':lookup,'save-topic':saveTopic,
+ 'save-copy':()=>busyWork(async()=>{state.draft.id=D.uid('DRAFT');delete state.draft.caseNumber;state.draft.caseNumber=D.caseNumber(state.draft);state.draft.revision=0;state.draft.updatedAt=null;closeDialog();if(await persist())render();}),
+ 'lookup':lookup,'lookup-party':lookupParty,'save-topic':saveTopic,
  'retry-courts':()=>busyWork(fetchCourts),
  'edit-topic':()=>{D.invalidate(state.draft,'court');changed();render();},
  'add-subtopic':addSubtopic,
@@ -333,7 +365,7 @@ const handlers={
  'cancel-party':()=>{state.draft.partyEditor=D.party();state.errors=[];changed();render();},
  'edit-party':el=>{state.draft.partyEditor=structuredClone(state.draft.parties.find(p=>p.id===el.dataset.id));state.errors=[];render();document.getElementById(U.fieldId('partyEditor.name'))?.focus();},
  'delete-party':el=>confirmDialog('حذف الطرف','هل تريد إزالة هذا الطرف من الطلب؟',()=>{state.draft.parties=state.draft.parties.filter(p=>p.id!==el.dataset.id);D.invalidate(state.draft);changed();render();},'حذف الطرف'),
- 'applicant-party':()=>{const d=state.draft,a=d.applicant;d.partyEditor={...D.party(),name:a.name,identity:a.personalId,mobile:a.mobile,email:a.email,address:structuredClone(a.address)};changed();render();},
+ 'applicant-party':()=>{const d=state.draft,a=d.applicant;d.partyEditor={...D.party(),name:a.name,identity:a.personalId,gender:'ذكر',nationality:'بحريني',lookup:D.lookupPartyIdentity('personal',a.personalId),mobile:a.mobile,email:a.email,address:structuredClone(a.address)};changed();render();},
  'upload':el=>document.getElementById('upload-'+el.dataset.category)?.click(),
  'download-file':el=>{const f=state.draft.files.find(f=>f.id===el.dataset.id);if(f)download(f.blob,f.name);},
  'delete-file':el=>confirmDialog('حذف المرفق','هل تريد حذف هذا الملف من الطلب؟',()=>{state.draft.files=state.draft.files.filter(f=>f.id!==el.dataset.id);D.invalidate(state.draft);changed();render();},'حذف المرفق'),
@@ -346,7 +378,7 @@ const handlers={
  'cancel-payment':()=>{closeDialog();toast('أُلغيت محاكاة الدفع. طلبك محفوظ.');},
  'confirm-payment':pay,'check-payment':checkPayment,'retry-registration':retryRegistration,
  'print':()=>window.print(),
- 'receipt':()=>{const d=state.draft;const text=['إيصال تجريبي — ليس مستندًا رسميًا','رقم القيد: '+d.registration.number,'رقم الطلب: '+d.id,'المسار: '+C.routes[d.route].label,'التاريخ: '+d.registration.date,'المبلغ التجريبي: '+D.money(d.fee.items.reduce((s,x)=>s+x.fils,0))+' د.ب','لم يتم تقديم دعوى أو سداد رسوم فعلية.'].join('\n');download(new Blob(['\uFEFF'+text],{type:'text/plain;charset=utf-8'}),'demo-receipt.txt');},
+ 'receipt':()=>{const d=state.draft;const text=['إيصال تجريبي — ليس مستندًا رسميًا','رقم القيد: '+D.caseNumber(d),'رقم القضية: '+D.caseNumber(d),'المسار: '+C.routes[d.route].label,'التاريخ: '+d.registration.date,'المبلغ التجريبي: '+D.money(d.fee.items.reduce((s,x)=>s+x.fils,0))+' د.ب','لم يتم تقديم دعوى أو سداد رسوم فعلية.'].join('\n');download(new Blob(['\uFEFF'+text],{type:'text/plain;charset=utf-8'}),'demo-receipt.txt');},
  'focus-error':async el=>{const step=el.dataset.step;if(step!==''&&Number(step)!==state.draft.step){state.draft.step=Number(step);render(true);}const target=document.getElementById(U.fieldId(el.dataset.field))||(el.dataset.field==='topic.courtId'?document.getElementById('court-result'):null);target?.focus();target?.scrollIntoView({block:'center',behavior:'smooth'});}
 };
 document.addEventListener('click',async event=>{
