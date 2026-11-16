@@ -8,7 +8,7 @@
    cassation: {label:'تمييز',short:'تمييز',description:'تقديم طعن بالتمييز على حكم استئنافي.',roles:['الطاعن','المطعون ضده'],icon:'scale'}
   },
   caseTypes: ['مدنية','مدنية مستعجلة','دعاوى المطالبات الصغيرة - مدني','دعاوى الفواتير - مدني','تجارية','عمالية - من العامل','شرعية'],
-  applicantRoles: [{id:'self',label:'مقدم الطلب لشخصه'},{id:'agency',label:'موكل بوكالة'},{id:'lawfirm',label:'ممثل قانوني عن مكتب محاماة'},{id:'government',label:'ممثل قانوني لجهة حكومية'}],
+  applicantRoles: [{id:'self',label:'مقدم الطلب لشخصه'},{id:'agency',label:'وكيل بوكالة'},{id:'lawfirm',label:'ممثل قانوني عن مكتب محاماة'},{id:'government',label:'ممثل قانوني لجهة حكومية'}],
   governments:['أمانة العاصمة','وزارة العدل والشؤون الإسلامية والأوقاف','إدارة الإصلاح والتأهيل','إدارة الاستملاك والتعويض'],
   identityTypes:[{id:'personal',label:'الرقم الشخصي'},{id:'company',label:'سجل تجاري'},{id:'government',label:'هيئة حكومية'}],
   governmentEntities:[{id:'GOV-01',label:'أمانة العاصمة'},{id:'GOV-02',label:'وزارة العدل والشؤون الإسلامية والأوقاف'},{id:'GOV-03',label:'إدارة الإصلاح والتأهيل'},{id:'GOV-04',label:'إدارة الاستملاك والتعويض'}],

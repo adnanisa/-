@@ -14,6 +14,10 @@ test('notifications combine search, type and remaining-time filters and sort nea
  assert.ok(D.filingNotifications(demo,{remaining:'expired'}).every(x=>x.availability.status==='expired'));
  assert.equal(D.filingNotifications(demo,{query:'NO-MATCH'}).length,0);
  assert.equal(D.filingNotifications(demo,{query:C.cases[0].number}).length,2);
+ assert.equal(D.filingNotifications(demo,{query:'٠١/٢٠٢٦/٠١٠٠١/١'}).length,2);
+ assert.equal(D.filingNotifications(demo,{query:'01001'}).length,2);
+ for(const query of [C.cases[0].court,C.cases[0].type,C.cases[0].judgments[0].label,C.routes[C.cases[0].route].label])assert.equal(D.filingNotifications(demo,{query}).length,0);
+ assert.equal(D.filingNotifications(demo,{query:C.cases[0].number,route:'appeal',remaining:'3'}).length,1);
 });
 test('identity lookup separates sources and reports missing records and service failure',()=>{
  assert.equal(D.lookupPartyIdentity('personal','DEMO-ID-001').data.name,'طرف تجريبي أول');

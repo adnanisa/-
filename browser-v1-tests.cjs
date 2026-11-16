@@ -21,6 +21,9 @@ const base=process.env.PROTOTYPE_URL||'http://127.0.0.1:4173',qa=process.env.QA_
    await p.locator('#filing-search').fill('NO-MATCH');await expect(p.getByText('لا توجد إشعارات مطابقة',{exact:true})).toBeVisible();await p.locator('#filing-search').fill('');
    await p.locator('#filing-remaining').selectOption('expired');await expect(p.locator('.filing-notification')).toHaveCount(1);await expect(p.locator('.filing-notification a')).toHaveCount(0);
    await p.locator('#filing-route').selectOption('all');await p.locator('#filing-remaining').selectOption('all');
+   await expect(p.locator('#filing-search')).toHaveAttribute('placeholder','رقم القضية');
+   await p.locator('#filing-search').fill('٠١/٢٠٢٦/٠١٠٠١/١');await expect(p.locator('.filing-notification')).toHaveCount(2);
+   await p.locator('#filing-search').fill('الصغرى المدنية');await expect(p.getByText('لا توجد إشعارات مطابقة',{exact:true})).toBeVisible();await p.locator('#filing-search').fill('');
    await p.locator('#draft-search').fill('٠٢/٢٠٢٦/٠٢٠٠١/١');await expect(p.locator('#draft-rows tr')).toHaveCount(1);await p.locator('#draft-rows [data-action="view-case"]').click();await expect(p.locator('.case-overview')).toContainText('02/2026/02001/1');await act(p,'home').click();
    await p.locator('#case-type-filter').selectOption('تجارية');await expect(p.getByText('لا توجد ملفات مطابقة',{exact:true})).toBeVisible();await p.locator('#case-type-filter').selectOption('all');
    await audit(p);await p.screenshot({path:path.join(qa,'v1-files-desktop.png'),fullPage:true});await p.setViewportSize({width:390,height:844});await p.screenshot({path:path.join(qa,'v1-files-mobile.png'),fullPage:true});

@@ -17,8 +17,8 @@
  function filingNotifications(demo={},filters={}){
   const q=normalizeDigits(filters.query||'').toLowerCase();
   return C.cases.flatMap(record=>record.judgments.map(judgment=>({record,judgment,availability:appealAvailability({route:record.route,reference:{status:'verified',data:record,judgment:judgment.id},demo})})))
-   .filter(({record,judgment,availability:a})=>(!filters.route||filters.route==='all'||record.route===filters.route)&&
-    (!q||[record.number,record.type,record.court,judgment.label,C.routes[record.route].label].join(' ').toLowerCase().includes(q))&&
+   .filter(({record,availability:a})=>(!filters.route||filters.route==='all'||record.route===filters.route)&&
+    (!q||normalizeDigits(record.number).includes(q))&&
     (!filters.remaining||filters.remaining==='all'||(filters.remaining==='available'?a.allowed:filters.remaining==='expired'?a.status==='expired':filters.remaining==='unavailable'?!a.allowed&&a.status!=='expired':a.allowed&&a.remainingDays<=Number(filters.remaining))))
    .sort((a,b)=>Number(b.availability.allowed)-Number(a.availability.allowed)||(a.availability.remainingDays??Infinity)-(b.availability.remainingDays??Infinity)||a.record.number.localeCompare(b.record.number));
  }

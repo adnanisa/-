@@ -48,6 +48,7 @@ let passed=0;
  try{
   await run('conditional applicant, incomplete save and cross-reload resume',async()=>{
    const p=await fresh();await create(p);
+   await expect(field(p,'applicant.role').locator('option[value="agency"]')).toHaveText('وكيل بوكالة');
    await field(p,'applicant.role').selectOption('agency');await expect(field(p,'applicant.agency')).toBeVisible();
    await field(p,'applicant.agency').fill('DEMO-POA');
    await field(p,'applicant.role').selectOption('government');await expect(field(p,'applicant.government')).toBeVisible();
