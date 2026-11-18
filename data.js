@@ -8,6 +8,11 @@
    cassation: {label:'تمييز',short:'تمييز',description:'تقديم طعن بالتمييز على حكم استئنافي.',roles:['الطاعن','المطعون ضده'],icon:'scale'}
   },
   caseTypes: ['مدنية','مدنية مستعجلة','دعاوى المطالبات الصغيرة - مدني','دعاوى الفواتير - مدني','تجارية','عمالية - من العامل','شرعية'],
+  // Illustrative mapping only; Courts Administration must approve the production catalogue.
+  challengeMappings:[
+   {initialType:'مدنية',appealType:'استئناف مدني',cassationTypes:['تمييز مدني']},
+   {initialType:'تجارية',appealType:'استئناف تجاري',cassationTypes:['تمييز تجاري']}
+  ],
   applicantRoles: [{id:'self',label:'مقدم الطلب لشخصه'},{id:'agency',label:'وكيل بوكالة'},{id:'lawfirm',label:'ممثل قانوني عن مكتب محاماة'},{id:'government',label:'ممثل قانوني لجهة حكومية'}],
   governments:['أمانة العاصمة','وزارة العدل والشؤون الإسلامية والأوقاف','إدارة الإصلاح والتأهيل','إدارة الاستملاك والتعويض'],
   identityTypes:[{id:'personal',label:'الرقم الشخصي'},{id:'company',label:'سجل تجاري'},{id:'government',label:'هيئة حكومية'}],
@@ -27,11 +32,11 @@
   ],
   // Fixed sample dates use the visible simulation clock, never an asserted legal time limit.
   cases:[
-   {route:'appeal',number:'01/2026/01001/1',type:'مدنية',court:'الصغرى المدنية',state:'محسومة — تجريبية',original:'01/2026/01001/1',topic:'civil',
+   {route:'appeal',number:'01/2026/01001/1',type:'مدنية',originalType:'مدنية',jurisdiction:'مدني',court:'الصغرى المدنية',state:'محسومة — تجريبية',original:'01/2026/01001/1',topic:'civil',
     requests:[{name:'مطالبة مالية',amount:'1200.000'},{name:'تعويض عن ضرر مادي',amount:'250.000'}],
     judgments:[{id:'J-01',label:'الحكم التجريبي الأول · 01/10/2026',date:'2026-10-01',deadline:'2026-11-20',eligible:true},
      {id:'J-02',label:'الحكم التجريبي الثاني · 15/10/2026',date:'2026-10-15',deadline:'2026-11-14',eligible:true}]},
-   {route:'cassation',number:'02/2026/02001/1',type:'مدنية',court:'محكمة الاستئناف العليا المدنية',state:'محسومة — تجريبية',original:'01/2026/01001/1',topic:'civil',
+   {route:'cassation',number:'02/2026/02001/1',type:'استئناف مدني',originalType:'مدنية',jurisdiction:'مدني',court:'محكمة الاستئناف العليا المدنية',state:'محسومة — تجريبية',original:'01/2026/01001/1',topic:'civil',
     requests:[{name:'مطالبة مالية',amount:'1200.000'}],
     judgments:[{id:'J-01',label:'الحكم الاستئنافي التجريبي الأول · 01/10/2026',date:'2026-10-01',deadline:'2026-11-18',eligible:true},
      {id:'J-02',label:'الحكم الاستئنافي التجريبي الثاني · 15/10/2026',date:'2026-10-15',deadline:'2026-11-10',eligible:true},

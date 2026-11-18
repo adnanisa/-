@@ -39,7 +39,7 @@
    topic:{main:'',relatedCase:'',saved:false,courts:[],courtId:'',courtStatus:'idle'},
    subtopics:[],subEditor:{id:'',name:'',amount:''},parties:[],partyEditor:party(),
    files:[],session:'',ack:false,fee:{status:'idle',items:[]},payment:{status:'none',id:''},registration:null,
-   demo:{asOfDate:C.demoRules.asOfDate,court:'single',fee:'payable',reference:'valid',payment:'success',identity:'valid'}};
+   demo:{mapping:'configured',asOfDate:C.demoRules.asOfDate,court:'single',fee:'payable',reference:'valid',payment:'success',identity:'valid'}};
  }
  function resolveCourts(courts){return {status:courts.length===1?'ready':courts.length>1?'choose':'empty',courtId:courts.length===1?courts[0].id:''};}
  function courtsFor(d){
@@ -78,6 +78,22 @@
   if(!record)return {status:'invalid',message:'استخدم الرقم التجريبي '+(route==='appeal'?'01/2026/01001/1':'02/2026/02001/1')+' لهذا المسار.'};
   return {status:'verified',message:'',data:structuredClone(record)};
  }
+ // Resolve the whole chain; never fall back to the general case-type catalogue.
+ function challengeMapping(d){
+  if(d.route==='initial')return {status:'ready',types:C.caseTypes,message:''};
+  const r=d.reference?.data;
+  if(d.reference?.status!=='verified'||!r)return {status:'unverified',types:[],message:'اختر القضية وتحقق من مرجعها لعرض أنواع الطعن المرتبطة بها.'};
+  if(r.route!==d.route||!r.type||!r.originalType||!r.original||!r.topic||!r.jurisdiction)return {status:'incomplete',types:[],message:'بيانات نوع القضية أو الموضوع أو الاختصاص أو ارتباطها بالقضية الأصلية غير مكتملة. يلزم استكمالها لدى إدارة المحاكم؛ يمكنك حفظ المسودة.'};
+  const rows=d.demo?.mapping==='missing'?[]:C.challengeMappings.filter(m=>m.initialType===(d.route==='appeal'?r.type:r.originalType));
+  const types=[...new Set(d.route==='appeal'?rows.map(m=>m.appealType):rows.filter(m=>m.appealType===r.type).flatMap(m=>m.cassationTypes))].filter(Boolean);
+  return types.length?{status:'ready',types,message:'تظهر فقط أنواع الطعن المرتبطة بالقضية المختارة.'}:{status:'missing',types:[],message:'لا يوجد نوع '+(d.route==='appeal'?'استئناف':'تمييز')+' مرتبط بالقضية المختارة في إعدادات النظام. يلزم الرجوع إلى إدارة المحاكم لتحديد الإجراء المعتمد. يمكنك حفظ المسودة، ولا يمكن متابعة الطلب حتى يتوفر الربط.'};
+ }
+ function caseTypeOptions(d){return challengeMapping(d).types;}
+ function clearReference(d){
+  d.reference={number:d.reference.number,status:'idle',data:null,judgment:'',message:''};
+  d.caseType='';d.topic.main='';d.subtopics=[];d.subEditor={id:'',name:'',amount:''};d.entry='';
+  invalidate(d,'court');
+ }
  function validDemoDate(value){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(value||''))return false;
   const date=new Date(value+'T00:00:00Z');
@@ -105,7 +121,7 @@
   d.reference={number,...result,judgment};
   const availability=appealAvailability(d);
   if(!availability.allowed)throw new Error(availability.reason);
-  d.reference.number=result.data.number;d.caseType=result.data.type;d.topic.main=result.data.topic;
+  d.reference.number=result.data.number;d.topic.main=result.data.topic;
   d.subtopics=referenceRequests(result.data);d.entry='linked';return d;
  }
  function parseFilingLink(hash){
@@ -148,7 +164,8 @@
  function validateStep(d,step){
   const e=[]; const add=(field,message)=>e.push({field,message});
   if(step===0){
-   if(!C.caseTypes.includes(d.caseType))add('caseType','اختر نوع دعوى من قائمة التجربة.');
+   const mapping=challengeMapping(d);
+   if(!mapping.types.includes(d.caseType))add('caseType',mapping.status!=='ready'?mapping.message:d.route==='initial'?'اختر نوع دعوى من قائمة التجربة.':'اختر نوع طعن من الأنواع المرتبطة بالقضية المختارة.');
    if(d.route!=='initial'){
     if(d.reference.status!=='verified')add('reference.number','تحقق من مرجع الدعوى أو الاستئناف قبل المواصلة.');
     if(!d.reference.judgment)add('reference.judgment','اختر الحكم محل الطعن.');
@@ -196,6 +213,6 @@
   d.status='registered';d.registration={number:caseNumber(d),date:new Date().toISOString()};return d;
  }
  function escape(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
- const api={caseNumber,filingNotifications,lookupPartyIdentity,uid,address,party,createDraft,resolveCourts,courtsFor,normalizeDigits,toFils,money,feesFor,finalAction,invalidate,lookupReference,validDemoDate,appealAvailability,minimumSubrequests,referenceRequests,createLinkedDraft,parseFilingLink,docsFor,validateParty,validateStep,validateFinal,canStartPayment,completeRegistration,escape};
+ const api={challengeMapping,caseTypeOptions,clearReference,caseNumber,filingNotifications,lookupPartyIdentity,uid,address,party,createDraft,resolveCourts,courtsFor,normalizeDigits,toFils,money,feesFor,finalAction,invalidate,lookupReference,validDemoDate,appealAvailability,minimumSubrequests,referenceRequests,createLinkedDraft,parseFilingLink,docsFor,validateParty,validateStep,validateFinal,canStartPayment,completeRegistration,escape};
  if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.LawsuitDomain=api;
 })(typeof window==='undefined'?globalThis:window);

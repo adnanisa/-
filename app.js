@@ -2,7 +2,7 @@
 'use strict';
 const C=window.LawsuitData,D=window.LawsuitDomain,U=window.LawsuitUI,Store=window.LawsuitStore;
 const main=document.getElementById('main'),modal=document.getElementById('modal');
-const state={draft:null,items:[],screen:'dashboard',errors:[],dirty:false,busy:false,version:0,storageError:'',filingFilters:{query:'',route:'all',remaining:'all'},demoDefaults:{asOfDate:C.demoRules.asOfDate,court:'single',fee:'payable',reference:'valid',payment:'success',identity:'valid'}};
+const state={draft:null,items:[],screen:'dashboard',errors:[],dirty:false,busy:false,version:0,storageError:'',filingFilters:{query:'',route:'all',remaining:'all'},demoDefaults:{mapping:'configured',asOfDate:C.demoRules.asOfDate,court:'single',fee:'payable',reference:'valid',payment:'success',identity:'valid'}};
 let toastTimer,confirmCallback,lastFocus;
 function toast(message,error=false){
  const el=document.getElementById('toast');el.textContent=message;el.className='toast visible'+(error?' error':'');
@@ -64,7 +64,7 @@ function boundChange(el,refresh=false){
  const parts=path.split('.');const old=parts.reduce((o,k)=>o?.[k],d);
  const value=el.type==='checkbox'?el.checked:el.value;
  if(old===value){if(refresh)render();return;}
- if(path==='ack'){d.ack=value;state.dirty=true;state.version++;const b=main.querySelector('[data-action="final"]');if(b)b.disabled=!value||D.finalAction(d.fee)==='unavailable'||!D.appealAvailability(d).allowed;return;}
+ if(path==='ack'){d.ack=value;state.dirty=true;state.version++;const b=main.querySelector('[data-action="final"]');if(b)b.disabled=!value||D.finalAction(d.fee)==='unavailable'||!D.appealAvailability(d).allowed||!D.caseTypeOptions(d).includes(d.caseType);return;}
  setPath(d,path,value);
  if(path==='partyEditor.identityType')d.partyEditor={...D.party(),id:d.partyEditor.id,role:d.partyEditor.role,identityType:value};
  if(path==='partyEditor.identity'){
@@ -74,7 +74,7 @@ function boundChange(el,refresh=false){
   document.getElementById('identity-result')?.replaceChildren();
  }
  changed();state.errors=state.errors.filter(x=>x.field!==path);
- if(path==='reference.number'){d.reference.status='idle';d.reference.data=null;d.reference.judgment='';d.reference.message='';d.subtopics=[];d.topic.main='';d.entry='';D.invalidate(d,'court');document.getElementById('reference-result')?.replaceChildren();}
+ if(path==='reference.number'){D.clearReference(d);document.getElementById('reference-result')?.replaceChildren();const section=document.getElementById('case-type-section');if(section)section.outerHTML=U.caseTypeSection(d);}
  else if(path==='caseType'||path==='topic.main'||path==='topic.relatedCase'||path==='reference.judgment')D.invalidate(d,'court');
  else if(path==='topic.courtId'){d.session='';D.invalidate(d);}
  else if(!path.startsWith('subEditor.')&&!path.startsWith('partyEditor.'))D.invalidate(d);
@@ -117,7 +117,7 @@ async function create(route){
 async function resume(id){
  const d=await Store.get(id);if(!d){toast('هذه المسودة لم تعد متاحة.',true);await home();return;}
  d.caseNumber=D.caseNumber(d);d.partyEditor.lookup||={status:'idle'};
- d.demo={asOfDate:C.demoRules.asOfDate,identity:'valid',...d.demo};
+ d.demo={mapping:'configured',asOfDate:C.demoRules.asOfDate,identity:'valid',...d.demo};
  state.draft=d;state.dirty=false;state.errors=[];state.version++;
  if(d.status==='registered'||['pending','paid'].includes(d.payment.status)){state.screen='result';render(true);return;}
  // Retain entries, but recheck simulated references/court and fees instead of trusting stale results.
@@ -125,7 +125,8 @@ async function resume(id){
   const r=D.lookupReference(d.route,d.reference.number,d.demo.reference);
   d.reference={...d.reference,data:null,...r};
   if(r.status==='verified')d.reference.number=r.data.number;
-  if(r.status==='verified'&&!d.subtopics.length)d.subtopics=D.referenceRequests(r.data);
+  if(r.status==='verified'){d.topic.main=r.data.topic;d.subtopics=D.referenceRequests(r.data);}
+  if(!D.caseTypeOptions(d).includes(d.caseType)){d.caseType='';D.invalidate(d,'court');d.step=0;}
   if(!D.appealAvailability(d).allowed){D.invalidate(d,'court');d.step=0;}
  }
  if(d.topic.saved){
@@ -141,11 +142,11 @@ async function lookup(){
  const d=state.draft;
  if(!d.reference.number.trim()){showErrors([{field:'reference.number',message:'أدخل الرقم التجريبي للمرجع.',step:0}]);return;}
  await busyWork(async()=>{
-  d.reference.status='loading';d.reference.message='';render();await delay();
+  D.clearReference(d);d.reference.status='loading';render();await delay();
   const result=D.lookupReference(d.route,d.reference.number,d.demo.reference);
   d.reference={...d.reference,data:null,...result,judgment:''};d.entry='';d.subtopics=[];
   D.invalidate(d,'court');
-  if(result.status==='verified'){d.caseType=result.data.type;d.topic.main=result.data.topic;d.subtopics=D.referenceRequests(result.data);}
+  if(result.status==='verified'){d.reference.number=result.data.number;d.topic.main=result.data.topic;d.subtopics=D.referenceRequests(result.data);}
   changed();render();
  });
 }
@@ -219,7 +220,7 @@ async function calculateFees(){
 }
 async function next(){
  const d=state.draft;
- if(d.route!=='initial'&&!D.appealAvailability(d).allowed){d.step=0;showErrors(D.validateStep(d,0));return;}
+ if(d.route!=='initial'&&(!D.appealAvailability(d).allowed||!D.caseTypeOptions(d).includes(d.caseType))){d.step=0;showErrors(D.validateStep(d,0));return;}
  const errors=D.validateStep(d,d.step);
  if(errors.length){showErrors(errors);return;}
  await busyWork(async()=>{
@@ -309,6 +310,7 @@ async function fillDemo(){
    d.reference.number=d.route==='appeal'?'01/2026/01001/1':'02/2026/02001/1';
    const r=D.lookupReference(d.route,d.reference.number,d.demo.reference);d.reference={...d.reference,...r,judgment:r.status==='verified'?'J-01':''};
    if(r.status==='verified'){d.topic.main=r.data.topic;d.subtopics=D.referenceRequests(r.data);}
+   d.caseType=D.caseTypeOptions(d)[0]||'';
   }
  }else if(d.step===1){
   d.topic.main='civil';
@@ -331,7 +333,8 @@ async function applyDemo(){
  if(d&&state.screen==='wizard'){
   const previous=d.demo;d.demo=values;
   if(previous.court!==values.court)D.invalidate(d,'court');
-  if(previous.reference!==values.reference&&d.route!=='initial'){d.reference.status='idle';d.reference.data=null;d.reference.judgment='';D.invalidate(d,'court');}
+  if(previous.reference!==values.reference&&d.route!=='initial'){D.clearReference(d);d.step=0;}
+  if((previous.mapping||'configured')!==values.mapping&&d.route!=='initial'){if(!D.caseTypeOptions(d).includes(d.caseType))d.caseType='';D.invalidate(d,'court');d.step=0;}
   if(previous.fee!==values.fee||previous.asOfDate!==values.asOfDate)D.invalidate(d);
   changed();render();if(d.step===4)await calculateFees();
  }
